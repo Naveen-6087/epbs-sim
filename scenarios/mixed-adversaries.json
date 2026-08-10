@@ -1,0 +1,34 @@
+{
+  "name": "mixed-adversaries",
+  "seed": 1,
+  "slots": 500,
+  "committee_size": 2048,
+  "builders": {
+    "count": 8,
+    "withhold_fraction": 0.125,
+    "late_fraction": 0.125,
+    "reveal_ms": 4000,
+    "late_reveal_ms": 7000,
+    "value_median_gwei": 40000000.0,
+    "value_sigma": 0.8,
+    "bid_fraction": 0.9,
+    "self_build_probability": 0.0
+  },
+  "network": {
+    "latency_median_ms": 400.0,
+    "latency_sigma": 0.6,
+    "payload_extra_ms": 150.0,
+    "blob_extra_ms": 400.0,
+    "partition_fraction": 0.1,
+    "partition_delay_ms": 1500.0
+  },
+  "proposers": {
+    "late_fraction": 0.05,
+    "late_publish_ms": 3500,
+    "offline_fraction": 0.02
+  },
+  "ptc": {
+    "colluding_fraction": 0.2,
+    "attack": "vote_absent"
+  }
+}
