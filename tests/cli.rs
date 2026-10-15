@@ -91,3 +91,17 @@ fn usage_errors_exit_2() {
         assert_eq!(run(&args).status.code(), Some(2), "{args:?}");
     }
 }
+
+#[test]
+fn compare_runs_every_scenario() {
+    let text = stdout(&run(&["compare", "--slots", "40"]));
+    let lines: Vec<_> = text.lines().collect();
+    assert!(lines[0].starts_with("scenario"));
+    assert_eq!(lines.len(), 1 + epbs_sim::presets().len());
+    assert!(lines[1].starts_with("baseline") && lines[1].contains("100.0%"));
+    let v: serde_json::Value =
+        serde_json::from_slice(&run(&["compare", "--slots", "40", "--format", "json"]).stdout).unwrap();
+    let rows = v.as_array().unwrap();
+    assert_eq!(rows.len(), epbs_sim::presets().len());
+    assert_eq!(rows[0]["summary"]["slots"], 40);
+}
