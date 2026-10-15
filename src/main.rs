@@ -6,6 +6,9 @@ use clap::{Args, Parser, Subcommand, ValueEnum};
 use epbs_sim::{Config, ConfigError, preset, presets, run, summarize};
 use serde_json::Value;
 
+#[cfg(feature = "tui")]
+mod tui;
+
 /// Discrete-event simulator for enshrined proposer-builder separation (EIP-7732).
 #[derive(Parser, Debug)]
 #[command(name = "epbs-sim", version)]
@@ -46,6 +49,21 @@ enum Command {
         /// Number of seeds per value (seed, seed + 1, ...).
         #[arg(long, default_value_t = 1)]
         seeds: u64,
+    },
+    /// Run every built-in scenario with the same slots and seed and print one row each.
+    Compare {
+        #[arg(long, default_value_t = 1_000)]
+        slots: u64,
+        #[arg(long, default_value_t = 1)]
+        seed: u64,
+        #[arg(long, value_enum, default_value_t = Format::Text)]
+        format: Format,
+    },
+    /// Interactive terminal UI: play back runs slot by slot and switch scenarios.
+    #[cfg(feature = "tui")]
+    Tui {
+        #[command(flatten)]
+        source: Source,
     },
 }
 
@@ -208,6 +226,68 @@ fn run_cli(cli: Cli) -> Result<(), String> {
                 );
             }
             Ok(())
+        }
+        Command::Compare { slots, seed, format } => {
+            let configs: Vec<Config> = presets()
+                .into_iter()
+                .map(|mut c| {
+                    c.slots = slots;
+                    c.seed = seed;
+                    c
+                })
+                .collect();
+            let summaries: Vec<_> = std::thread::scope(|scope| {
+                let handles: Vec<_> =
+                    configs.iter().map(|c| scope.spawn(move || summarize(&run(c)))).collect();
+                handles.into_iter().map(|h| h.join().expect("simulation thread")).collect()
+            });
+            match format {
+                Format::Json => {
+                    let rows: Vec<_> = configs
+                        .iter()
+                        .zip(&summaries)
+                        .map(|(c, s)| serde_json::json!({"scenario": c.name, "summary": s}))
+                        .collect();
+                    println!("{}", serde_json::to_string_pretty(&rows).expect("serializable"));
+                }
+                Format::Text => {
+                    println!(
+                        "{:<22} {:>7} {:>7} {:>9} {:>7} {:>10} {:>10} {:>8}",
+                        "scenario", "full", "empty", "orphaned", "missed", "paid w/o", "honest", "ptc"
+                    );
+                    let pct = |n: u64, s: &epbs_sim::Summary| 100.0 * n as f64 / s.slots.max(1) as f64;
+                    for (c, s) in configs.iter().zip(&summaries) {
+                        println!(
+                            "{:<22} {:>6.1}% {:>6.1}% {:>8.1}% {:>6.1}% {:>10} {:>10} {:>8.0}",
+                            c.name,
+                            pct(s.full, s),
+                            pct(s.empty, s),
+                            pct(s.orphaned, s),
+                            pct(s.missed, s),
+                            s.paid_without_payload,
+                            s.honest_reveal_lost,
+                            s.mean_ptc_present
+                        );
+                    }
+                }
+            }
+            Ok(())
+        }
+        #[cfg(feature = "tui")]
+        Command::Tui { mut source } => {
+            source.slots = source.slots.or(Some(300));
+            let cfg = source.load()?;
+            let mut scenarios = presets();
+            let selected = match scenarios.iter().position(|c| source.config.is_none() && c.name == cfg.name)
+            {
+                Some(i) => i,
+                None => {
+                    scenarios.insert(0, cfg.clone());
+                    0
+                }
+            };
+            let mut app = tui::App::new(scenarios, selected, cfg.seed, cfg.slots);
+            tui::run_tui(&mut app).map_err(|e| e.to_string())
         }
     }
 }
