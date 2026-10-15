@@ -1,7 +1,11 @@
 use std::process::{Command, Output};
 
 fn run(args: &[&str]) -> Output {
-    Command::new(env!("CARGO_BIN_EXE_epbs-sim")).args(args).current_dir(env!("CARGO_MANIFEST_DIR")).output().unwrap()
+    Command::new(env!("CARGO_BIN_EXE_epbs-sim"))
+        .args(args)
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .output()
+        .unwrap()
 }
 
 fn stdout(o: &Output) -> String {
@@ -13,7 +17,8 @@ fn lists_and_prints_scenarios() {
     let out = stdout(&run(&["scenarios"]));
     assert!(out.lines().any(|l| l.starts_with("baseline") && l.ends_with("defaults")));
     assert!(out.contains("withholding-builders   builders.withhold_fraction=0.25"));
-    let cfg: serde_json::Value = serde_json::from_str(&stdout(&run(&["config", "--scenario", "partition"]))).unwrap();
+    let cfg: serde_json::Value =
+        serde_json::from_str(&stdout(&run(&["config", "--scenario", "partition"]))).unwrap();
     assert_eq!(cfg["network"]["partition_fraction"], 0.3);
 }
 
@@ -35,7 +40,17 @@ fn run_text_json_and_slot_csv() {
 
 #[test]
 fn config_files_and_overrides() {
-    let out = run(&["run", "--config", "scenarios/mixed-adversaries.json", "--slots", "40", "--seed", "9", "--format", "json"]);
+    let out = run(&[
+        "run",
+        "--config",
+        "scenarios/mixed-adversaries.json",
+        "--slots",
+        "40",
+        "--seed",
+        "9",
+        "--format",
+        "json",
+    ]);
     assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
     let v: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(v["config"]["name"], "mixed-adversaries");
@@ -45,7 +60,17 @@ fn config_files_and_overrides() {
 
 #[test]
 fn sweep_rows_are_ordered_and_reproducible() {
-    let args = ["sweep", "--param", "builders.withhold_fraction", "--values", "0,0.5", "--slots", "40", "--seeds", "2"];
+    let args = [
+        "sweep",
+        "--param",
+        "builders.withhold_fraction",
+        "--values",
+        "0,0.5",
+        "--slots",
+        "40",
+        "--seeds",
+        "2",
+    ];
     let a = stdout(&run(&args));
     assert_eq!(a, stdout(&run(&args)));
     let rows: Vec<&str> = a.lines().collect();

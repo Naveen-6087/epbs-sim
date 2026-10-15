@@ -529,7 +529,7 @@ mod tests {
         }
         s.on_slot(13);
         let scores = s.scores();
-        for (&root, _) in s.blocks.iter() {
+        for &root in s.blocks.keys() {
             for status in [Empty, Full, Pending] {
                 let node = Node::new(root, status);
                 assert_eq!(scores.get(&node).copied().unwrap_or(0), s.attestation_score(node), "{node:?}");
