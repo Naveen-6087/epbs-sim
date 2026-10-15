@@ -108,6 +108,10 @@ epbs-sim run [--scenario NAME | --config FILE] [--slots N] [--seed S]
              [--format text|json] [--slots-csv FILE]  one run, optionally one CSV row per slot
 epbs-sim sweep --param PATH --values a,b,c [--seeds K] [--scenario | --config] [--slots N]
                                                      vary any field by its dotted path; CSV per run
+epbs-sim compare [--slots N] [--seed S] [--format text|json]
+                                                     every preset side by side, one row each
+epbs-sim tui [--scenario NAME | --config FILE] [--slots N] [--seed S]
+                                                     interactive dashboard
 ```
 
 ```sh
@@ -130,9 +134,22 @@ Each slot record contains:
 
 `scenarios/mixed-adversaries.json` combines several adversaries.
 
+### Dashboard
+
+`epbs-sim tui` plays a run back slot by slot (300 slots by default) in the terminal:
+- a strip with one cell per slot, coloured by outcome
+- live outcome shares, payment counters and the mean PTC vote
+- the full record of the selected slot: proposer, builder strategy, bid, votes and PTC tally
+- sparklines of the rolling full-slot rate and of PTC "present" votes
+
+`↑`/`↓` switch scenario, `←`/`→` step through slots, `space` pauses or replays, `+`/`-` change the
+playback speed, `s`/`S` change the seed and `End` jumps to the end of the run. A `--config` file is
+added to the scenario list. The dashboard is behind the default `tui` feature; build with
+`--no-default-features` to leave out ratatui.
+
 ## Results
 
-These tables are 1,000-slot runs with seed 1 and the default 2,048-attester
+These tables are 1,000-slot runs with seed 1 (`epbs-sim compare` prints the first one) and the default 2,048-attester
 committee, reproducible with the commands above. "Paid w/o payload" counts
 bids paid although the payload never became canonical. "Honest & lost"
 counts honest builders that saw a timely block and revealed, but whose
@@ -203,6 +220,7 @@ What the model shows:
 | `sim` | The slot loop, agents, network delays and payment rules |
 | `metrics` | Summary statistics and text rendering |
 | `rng` | A self-contained PRNG (xoshiro256** seeded by SplitMix64) |
+| `tui` (binary) | The ratatui dashboard: playback state, key handling and layout |
 
 ### Design decisions
 
@@ -222,7 +240,7 @@ What the model shows:
 ## Testing
 
 ```sh
-cargo test        # 35 tests
+cargo test        # 39 tests
 ```
 
 | Suite | Checks |
@@ -230,7 +248,8 @@ cargo test        # 35 tests
 | Unit tests (16) | PRNG reference values (xoshiro256**, SplitMix64) and distributions; spec timing constants; config validation and presets; fork-choice predicates: pending children need a verified payload, ancestry respects payload status, PTC-decided tiebreaks, the exact 256-vote threshold, unverified payload means empty, proposer boost, later-slot votes, proposer re-orgs (late, on-time, single-slot, weak-head conditions), and batched scores equal per-node scores |
 | `tests/scenarios.rs` (12) | Honest runs include every payload and pay every bid; withheld payloads are empty but paid; late reveals miss the deadline; late weak blocks are re-orged and unpaid; offline proposers miss slots; a PTC majority empties slots while a minority cannot; the PTC cannot fake a withheld payload; missing blobs empty slots; self-builds pay nothing; inclusion degrades monotonically with latency; reproducibility |
 | `tests/properties.rs` (proptest, 2) | For random adversarial configurations: outcome counts add up, payments never exceed bids, full slots were revealed, included payloads are always paid, unpaid outcomes are never canonical, and runs are deterministic |
-| `tests/cli.rs` (5) | Every subcommand, JSON and CSV output, config files with overrides, sweep ordering and reproducibility, exit codes |
+| `tests/cli.rs` (6) | Every subcommand including `compare`, JSON and CSV output, config files with overrides, sweep ordering and reproducibility, exit codes |
+| `tui` unit tests (3) | Playback reveals slots and stops at the end, key bindings for scenario, seed, cursor and speed, and every panel renders on a test backend |
 
 ## Performance
 
